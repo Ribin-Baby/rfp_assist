@@ -3,6 +3,9 @@ from typing import  Dict, Any, List, Type
 from pydantic import BaseModel, ValidationError
 from pydantic.fields import PydanticUndefined
 from app.domain.common import _LIST_FIELDS, _STRING_FIELD
+import logging
+# Initialize global objects
+logger = logging.getLogger(__name__)
 
 # ---------- Validation tool (used by agents & pipeline) ----------
 def validate_extraction_json(model: BaseModel, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -164,11 +167,12 @@ def ingest_json_results_to_blob(result_content):
 
             elif document_type == "text":
                 # Add content to the blob
-                blob.append(entry["metadata"]["content"])
+                blob.append(entry["metadata"].get("content", ""))
                 blob.append("\n")
-                meta['source_id'] = entry['metadata']['source_metadata'].get('source_id', '')
-                meta['source_type'] = entry['metadata']['source_metadata'].get('source_type', '')
-                meta['page_number'] = entry['metadata']['content_metadata']['hierarchy'].get('page', -1)
+                meta['source'] = entry['metadata']['source_metadata'].get('source_id', '')
+                meta['content_metadata']={'source_type': entry['metadata']['source_metadata'].get('source_type', ''),
+                                          'content_metadata': entry['metadata'].get('content_metadata', {})}
+                # meta['content_metadata']['page_number'] = entry['metadata']['content_metadata']['hierarchy'].get('page', -1)
                 metadatas.append(meta)
 
             elif document_type == "image":

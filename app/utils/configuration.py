@@ -18,7 +18,9 @@ import os
 from .configuration_wizard import ConfigWizard
 from .configuration_wizard import configclass
 from .configuration_wizard import configfield
-
+import logging
+# Initialize global objects
+logger = logging.getLogger(__name__)
 
 @configclass
 class VectorStoreConfig(ConfigWizard):

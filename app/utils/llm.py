@@ -3,6 +3,9 @@ from typing import Optional, Tuple, Dict, Any
 from pydantic import ValidationError
 import time
 from app.utils.prompt import _error_addendum
+import logging
+# Initialize global objects
+logger = logging.getLogger(__name__)
 
 def invoke_with_retries(
     llm,
@@ -33,7 +36,7 @@ def invoke_with_retries(
                     {"role": "user", "content": user_base},
                 ]
             )
-
+            # print("LLM Output:", output_message)
             # 1) Extract JSON substring
             raw_json = extract_json_fn(output_message)
 
@@ -68,7 +71,7 @@ def invoke_with_retries(
             last_err = "Schema validation error(s): " + "; ".join(errs) + more
         except Exception as e:
             last_err = f"Unexpected error: {type(e).__name__}: {e}"
-
+        print(f"Attempt {attempt + 1} failed: {last_err}")
         # retry if we still have attempts left
         if attempt < retries:
             time.sleep(backoff_sec * (attempt + 1))

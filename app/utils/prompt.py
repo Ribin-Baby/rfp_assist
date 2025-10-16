@@ -1,9 +1,12 @@
 import json
 from typing import Optional
 from app.domain.common import SYSTEM_PROMPT, USER_PROMPT, ERROR_PROMPT
+import logging
+# Initialize global objects
+logger = logging.getLogger(__name__)
 
 def build_system_prompt(schema: dict) -> str:
-    return SYSTEM_PROMPT.format(schema=json.dumps(schema, ensure_ascii=False))
+    return SYSTEM_PROMPT.format(schema_json=json.dumps(schema, ensure_ascii=False))
 
 def build_user_prompt(prev_state: dict, chunk_text: str, unresolved_hint: list[str] | None = None) -> str:
     hint = ""

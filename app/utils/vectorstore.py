@@ -37,7 +37,7 @@ from langchain_core.runnables import RunnableAssign, RunnableLambda
 from opentelemetry import context as otel_context
 from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
 from langchain_core.documents import Document
-from nvidia_rag.utils.common import get_config
+from app.utils.common import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -613,3 +613,49 @@ def add_collection_name_to_retreived_docs(docs: List[Document], collection_name:
     for doc in docs:
         doc.metadata["collection_name"] = collection_name
     return docs
+
+def collection_exists(collections: dict, vdb_endpoint: str) -> bool:
+    existing_collections = get_collection(vdb_endpoint)
+    coll_values = set(collections.values())
+    collection_names = {c['collection_name'] for c in existing_collections}
+    return coll_values.issubset(collection_names)
+
+
+def add_schema(collections: dict, vdb_endpoint: str):
+    # 2) register (optional) metadata schema per collection (used by get_docs_vectorstore_langchain)
+    add_metadata_schema(collections["chunks"], vdb_endpoint, [
+        {"name": "doc_id"}, {"name": "vector"}, {"name": "source"}, {"name": "content_metadata"}, {"name": "text"}
+    ])
+    add_metadata_schema(collections["requirements"], vdb_endpoint, [{"name": "doc_id"}])
+    add_metadata_schema(collections["criteria"], vdb_endpoint, [{"name": "doc_id"}])
+    add_metadata_schema(collections["contacts"], vdb_endpoint, [
+        {"name": "doc_id"}, {"name": "name"}, {"name": "title"}, {"name": "email"}, {"name": "phone"}
+    ])
+    add_metadata_schema(collections["deadlines"], vdb_endpoint, [{"name": "doc_id"}, {"name": "date"}, {"name": "kind"}])
+    add_metadata_schema(collections["technologies"], vdb_endpoint, [{"name": "doc_id"}, {"name": "token"}])
+    add_metadata_schema(collections["standards"], vdb_endpoint, [{"name": "doc_id"}, {"name": "token"}])
+    add_metadata_schema(collections["organizations"], vdb_endpoint, [{"name": "doc_id"}, {"name": "org_name"}, {"name": "industry"}])
+
+    return True
+
+def init_collection(collections: dict, embed_dimension, vdb_endpoint: str) -> bool:
+    print(collection_exists(collections, vdb_endpoint))
+    # return True
+    if collection_exists(collections, vdb_endpoint):
+        logger.info(f"Collections already exist: {list(collections.values())}")
+    else:
+        # Ensure the special metadata-schema collection exists
+        create_metadata_schema_collection(vdb_endpoint)
+
+        # Collections (one per entity type + chunks)
+        
+        # 1) create the collections (NV helper calls NV-Ingest style creator under the hood)
+        create_collections(
+            list(collections.values()),
+            vdb_endpoint=vdb_endpoint,
+            dimension=embed_dimension,          # must match your embedder
+            collection_type="text"
+        )
+        # 2) register (optional) metadata schema per collection (used by get_docs_vectorstore_langchain)
+        add_schema(collections, vdb_endpoint)
+    return True

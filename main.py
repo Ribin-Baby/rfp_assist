@@ -8,7 +8,9 @@ from nv_ingest_client.client import Ingestor, NvIngestClient
 from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
 from app.services.ingester import get_nv_ingest_client
 from app.services.extractor import extract_entities_llm
-from app.utils.vectorstore import create_collections, create_metadata_schema_collection, add_metadata_schema, get_collection, get_vectorstore
+from app.utils.vectorstore import (create_collections, create_metadata_schema_collection, 
+                                   add_metadata_schema, get_collection, get_vectorstore, delete_collections,
+                                    add_schema, init_collection, collection_exists)
 from app.utils.common import get_config
 from app.domain.common import COLL
 from dotenv import load_dotenv
@@ -28,57 +30,12 @@ NV_INGEST_CONCURRENT_BATCHES = int(os.getenv("NV_INGEST_CONCURRENT_BATCHES", 4))
 
 split_options = {"chunk_size": 6144, "chunk_overlap": 248}
 collection_name = "multimodal_data"
-filepaths = ["/home/ubuntu/projects/rfp-exp/data/rfi for cloud adoption.pdf"]
 
-def collection_exists(collections: dict, vdb_endpoint: str) -> bool:
-    collections = get_collection(vdb_endpoint)
-    coll_values = set(collections.values())
-    collection_names = {c['collection_name'] for c in collections}
-    return coll_values.issubset(collection_names)
-
-
-def add_schema(collections: dict, vdb_endpoint: str):
-    # 2) register (optional) metadata schema per collection (used by get_docs_vectorstore_langchain)
-    add_metadata_schema(collections["chunks"], vdb_endpoint, [
-        {"name": "doc_id"}, {"name": "page"}, {"name": "chunk_index"}, {"name": "title"}
-    ])
-    add_metadata_schema(collections["requirements"], vdb_endpoint, [{"name": "doc_id"}])
-    add_metadata_schema(collections["criteria"], vdb_endpoint, [{"name": "doc_id"}])
-    add_metadata_schema(collections["contacts"], vdb_endpoint, [
-        {"name": "doc_id"}, {"name": "name"}, {"name": "title"}, {"name": "email"}, {"name": "phone"}
-    ])
-    add_metadata_schema(collections["deadlines"], vdb_endpoint, [{"name": "doc_id"}, {"name": "date"}, {"name": "kind"}])
-    add_metadata_schema(collections["technologies"], vdb_endpoint, [{"name": "doc_id"}, {"name": "token"}])
-    add_metadata_schema(collections["standards"], vdb_endpoint, [{"name": "doc_id"}, {"name": "token"}])
-    add_metadata_schema(collections["organizations"], vdb_endpoint, [{"name": "doc_id"}, {"name": "org_name"}, {"name": "industry"}])
-
-    return True
-
-def init_collection(collections: dict, embed_dimension, vdb_endpoint: str) -> bool:
-    print(collection_exists(collections, vdb_endpoint))
-    # return True
-    if collection_exists(collections, vdb_endpoint):
-        logger.info(f"Collections already exist: {list(collections.values())}")
-    else:
-        # Ensure the special metadata-schema collection exists
-        create_metadata_schema_collection(vdb_endpoint)
-
-        # Collections (one per entity type + chunks)
-        
-        # 1) create the collections (NV helper calls NV-Ingest style creator under the hood)
-        create_collections(
-            list(collections.values()),
-            vdb_endpoint=vdb_endpoint,
-            dimension=embed_dimension,          # must match your embedder
-            collection_type="text"
-        )
-        # 2) register (optional) metadata schema per collection (used by get_docs_vectorstore_langchain)
-        add_metadata_schema(collections, vdb_endpoint)
-    return True
 
 if __name__=="__main__":
     ingestor = Ingestor(client=NV_INGEST_CLIENT_INSTANCE)
     # Add files to ingestor
+    filepaths = ["/home/ubuntu/projects/datas/rfi for cloud adoption.pdf"]
     ingestor = ingestor.files(filepaths)
     # Create kwargs for extract method
     extract_kwargs = {
@@ -127,7 +84,10 @@ if __name__=="__main__":
     vs_org           = get_vectorstore(document_embedder, collection_name=COLL["organizations"], vdb_endpoint=CONFIG.vector_store.url)
 
     # extract entities using LLM
-    json_outs = extract_entities_llm(results)
-    
-     
-
+    json_outs, documents = extract_entities_llm(results)
+    print("Final Extracted JSON:", json.dumps(json_outs, indent=2))
+    # print(documents)
+    # vs_chunks.add_documents(documents)
+    # result = vs_chunks.search(query="What is the requirements of the RFP?", search_type="mmr", k=3)
+    # print(result)
+    # delete_collections(collection_names=[COLL["chunks"]], vdb_endpoint=CONFIG.vector_store.url)

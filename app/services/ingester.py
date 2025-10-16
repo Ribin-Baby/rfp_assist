@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Any, Dict, List, Tuple, Optional
 from langchain_core.documents import Document
-from app.utils import ingest_json_results_to_blob
+from app.utils.process_json import ingest_json_results_to_blob
 from uuid import uuid4
 import os
 import logging

@@ -6,6 +6,9 @@ from copy import deepcopy
 # v2 exports the sentinel via pydantic.fields
 from pydantic.fields import PydanticUndefined
 from app.domain.common import defaults_none, EMAIL_RE, PHONE_RE, WS, MISSING_TOKENS, _DATE_REGEX
+import logging
+# Initialize global objects
+logger = logging.getLogger(__name__)
 
 def _to_str_list(x: Any) -> List[str]:
     if x is None:
@@ -192,11 +195,12 @@ def sanitize_llm_extraction(d: Dict[str, Any], *, empty_string_for_scalars: bool
       - Coerce mixed types into the expected shapes.
       - Optionally convert null scalars to "" (off by default to avoid breaking pattern-validated fields).
     """
+    global defaults_none
     data = dict(d)  # shallow copy
 
     # Ensure keys exist; if absent, set to None so normalizers can handle them
-    defaults_none = defaults_none.copy()
-    for k, v in defaults_none.items():
+    defaultnones = defaults_none.copy()
+    for k, v in defaultnones.items():
         data.setdefault(k, v)
 
     # List-of-string fields
@@ -280,7 +284,7 @@ def filter_with_prev_backup(
     prev = deepcopy(prev_clean or {})
     merged = deepcopy(prev)  # start from previous trusted state
     text = chunk_text or ""
-    print("Chunk:", text)
+    # print("Chunk:", text)
     text_norm = _norm(text)
 
     # --- document_id: preserve from prev or payload; do not verify against text
