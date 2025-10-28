@@ -67,10 +67,15 @@ def extract_entities_llm(pdfs: List[List[Dict[str, Any]]], system_prompt: Option
                                     ensure_defaults_fn=ensure_defaults,
                                     sanitize_fn=sanitize_llm_extraction,
                                     extract_json_fn=extract_json_between_braces,
-                                    contains_date_fn=contains_date,
-                                    prev_state=prev_state,     # optional; you can also bake it into `user`
                                     retries=2,                 # default
                                 )
+
+                # 5) Post-filter deadlines (example rule you already use)
+                clean_data["deadlines"] = [
+                    d for d in clean_data.get("deadlines", [])
+                    if contains_date(d.get("date", ""))
+                ]
+
                 # print("Cleaned LLM Output L1:", json.dumps(clean_data, indent=2))
                 if clean_data is not None:
                     # cleaned, log = filter_payload_by_chunk(clean_data, text)

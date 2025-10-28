@@ -16,8 +16,6 @@ def invoke_with_retries(
     ensure_defaults_fn,                # e.g., ensure_defaults(data, ExSchema)
     sanitize_fn,                       # e.g., sanitize_llm_extraction(...)
     extract_json_fn,                   # e.g., extract_json_between_braces(...)
-    contains_date_fn,                  # e.g., contains_date(...)
-    prev_state: Optional[Dict[str, Any]] = None,
     retries: int = 2,
     backoff_sec: float = 0.6,
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
@@ -30,7 +28,7 @@ def invoke_with_retries(
     for attempt in range(retries + 1):
         sys = sys_base + _error_addendum(last_err)
         try:
-            output_message = llm.call(
+            output = llm.call(
                 messages=[
                     {"role": "system", "content": sys},
                     {"role": "user", "content": user_base},
@@ -38,26 +36,22 @@ def invoke_with_retries(
             )
             # print("LLM Output:", output_message)
             # 1) Extract JSON substring
-            raw_json = extract_json_fn(output_message)
+            if extract_json_fn:
+                output = extract_json_fn(output)
 
-            # 2) Parse JSON
-            data = json.loads(raw_json)
+                # 2) Parse JSON
+                output = json.loads(output)
+            if ensure_defaults_fn:
+                # 3) Validate / coerce with Pydantic
+                #    - enforce required-but-nullable fields
+                output = ensure_defaults_fn(output, schema_model)
 
-            # 3) Validate / coerce with Pydantic
-            #    - enforce required-but-nullable fields
-            data = ensure_defaults_fn(data, schema_model)
-
-            # 4) Sanitize business rules
-            clean_data = sanitize_fn(data, empty_string_for_scalars=False)
-
-            # 5) Post-filter deadlines (example rule you already use)
-            clean_data["deadlines"] = [
-                d for d in clean_data.get("deadlines", [])
-                if contains_date_fn(d.get("date", ""))
-            ]
+            if sanitize_fn:
+                # 4) Sanitize business rules
+                output = sanitize_fn(output, empty_string_for_scalars=False)
 
             # Success!
-            return clean_data, None
+            return output, None
 
         except json.JSONDecodeError as e:
             last_err = f"JSON decoding error at pos {e.pos}: {e.msg}"
